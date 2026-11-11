@@ -145,8 +145,7 @@ export default function ResultEntry({ matches }: ResultEntryProps) {
       </button>
 
       <small style={{ color: "var(--muted)" }}>
-        A team must reach 8 games and lead by 2. Winner is calculated
-        automatically.
+        A team must reach 8 games and lead by 2. At 7–7, a tiebreak decides 8–7. Winner is calculated automatically.
       </small>
 
       {message && (
