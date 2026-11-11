@@ -58,9 +58,15 @@ export default async function Results({ searchParams }: { searchParams: Promise<
       blueTotal = scores.reduce((sum, row) => sum + row.blue_games, 0);
       whiteTotal = scores.reduce((sum, row) => sum + row.white_games, 0);
     }
-    if (selectedDate) {
-      const { data } = await db.from("daily_aggregate_scores").select("*").eq("match_date", selectedDate).maybeSingle();
+    const shareDate = selectedDate ?? matches[0]?.match_date;
+    if (shareDate) {
+      const { data } = await db.from("daily_aggregate_scores").select("*").eq("match_date", shareDate).maybeSingle();
       daily = data as DailyAggregate | null;
+      if (!selectedDate) {
+        const dailyMatches = matches.filter((match) => match.match_date === shareDate);
+        const dailyNumbers = new Set(dailyMatches.map((match) => match.match_number));
+        shareRows = shareRows.filter((row) => dailyNumbers.has(row.match_number));
+      }
     }
   }
 
