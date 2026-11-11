@@ -13,12 +13,11 @@ type MatchResult = {
     white_games: number;
   }[];
   match_players: {
-    team_id: string;
     players: {
       full_name: string;
-    }[];
-    teams: {
-      name: string;
+      teams: {
+        name: string;
+      }[];
     }[];
   }[];
   match_results: {
@@ -48,7 +47,7 @@ export default async function Results({
     let query = db
       .from("matches")
       .select(
-        "id,match_number,match_date,category,match_scores(blue_games,white_games),match_players(team_id,players(full_name),teams(name)),match_results(winning_team_id)",
+        "id,match_number,match_date,category,match_scores(blue_games,white_games),match_players(players(full_name,teams(name))),match_results(winning_team_id)",
       )
       .eq("status", "completed")
       .eq("published", true)
@@ -125,14 +124,14 @@ export default async function Results({
 
             const bluePlayers = match.match_players
               .filter((player) =>
-                player.teams[0]?.name.toLowerCase().includes("blue"),
+                player.players[0]?.teams[0]?.name.toLowerCase().includes("blue"),
               )
               .map((player) => player.players[0]?.full_name)
               .filter((name): name is string => Boolean(name));
 
             const whitePlayers = match.match_players
               .filter((player) =>
-                player.teams[0]?.name.toLowerCase().includes("white"),
+                player.players[0]?.teams[0]?.name.toLowerCase().includes("white"),
               )
               .map((player) => player.players[0]?.full_name)
               .filter((name): name is string => Boolean(name));
