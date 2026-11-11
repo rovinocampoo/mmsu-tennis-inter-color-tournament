@@ -1,0 +1,75 @@
+-- Official roster only. Safe to re-run: teams and players are upserted by stable names.
+insert into public.teams(name, color, team_leader) values
+ ('Team Blue','#3478df','Chloe Castro'),
+ ('Team White','#f5f5ed','Kathleen Flojo')
+on conflict(name) do update set color=excluded.color, team_leader=excluded.team_leader;
+insert into public.players(team_id,full_name)
+select t.id, roster.full_name
+from (values ('Team Blue',"Angel Badeth"),
+('Team Blue',"Hannah Mata"),
+('Team Blue',"Alvin Velasquez"),
+('Team Blue',"Chayan Hombrob ueno"),
+('Team Blue',"Francis Madrid"),
+('Team Blue',"Louie Guerrero"),
+('Team Blue',"John Paul Castro"),
+('Team Blue',"Van Van Acuna"),
+('Team Blue',"Castor Bumanlag"),
+('Team Blue',"Chadley Balicao"),
+('Team Blue',"Buchard Cutin"),
+('Team Blue',"Frances Franco"),
+('Team Blue',"Kim Castro"),
+('Team Blue',"MJ Castro"),
+('Team Blue',"Aura Castro"),
+('Team Blue',"AJ Espiritu"),
+('Team Blue',"Jelon Paraoan"),
+('Team Blue',"Med Aga"),
+('Team Blue',"Dathan Lagustan"),
+('Team Blue',"Rock Dadiz"),
+('Team Blue',"Rovin Ocampo"),
+('Team Blue',"John Cuanang"),
+('Team Blue',"Jerome Wangkey"),
+('Team Blue',"Earl Mendoza"),
+('Team Blue',"Jenny Concepcion-Tabal"),
+('Team Blue',"Jessica Guittap"),
+('Team Blue',"Kristine Yere"),
+('Team Blue',"Enzo Singson"),
+('Team Blue',"Arvin Soriano"),
+('Team Blue',"Vincent Castro"),
+('Team White',"Andrea Castillo"),
+('Team White',"Angel Trisha Toribio"),
+('Team White',"Bryan Acantilado"),
+('Team White',"Janzzen Bartolome"),
+('Team White',"Leon Blas"),
+('Team White',"Prince Estavillo"),
+('Team White',"Cesar Arevalo"),
+('Team White',"Jed Arnel Raquel"),
+('Team White',"Raffy Sadang"),
+('Team White',"Oddie Olalo"),
+('Team White',"Larry Agustin"),
+('Team White',"Vina Cuanang-Cruz"),
+('Team White',"Megan Lacambra"),
+('Team White',"Rinalyn Portugal"),
+('Team White',"Leigh Corpuz"),
+('Team White',"Lyka Corpuz"),
+('Team White',"Donna Villon"),
+('Team White',"Karl Jade Labucay"),
+('Team White',"Jessie Mata"),
+('Team White',"Brien Lutap"),
+('Team White',"Buboy Mata"),
+('Team White',"Nestor Corpuz"),
+('Team White',"Jethro Guittap"),
+('Team White',"Jan Luis Corpuz"),
+('Team White',"Marlon Labucay"),
+('Team White',"Gianni Soriano"),
+('Team White',"Stephanie Ulep"),
+('Team White',"Chantiley Dadiz"),
+('Team White',"Rachelle Bocoboc"),
+('Team White',"Felix Theodore Raquel"),
+('Team White',"Kim Lorenzo")) as roster(team_name,full_name)
+join public.teams t on t.name=roster.team_name
+on conflict(team_id,full_name) do update set active=true;
+do $$ declare b int; w int; begin
+ select count(*) into b from public.players p join public.teams t on t.id=p.team_id where t.name='Team Blue' and p.active;
+ select count(*) into w from public.players p join public.teams t on t.id=p.team_id where t.name='Team White' and p.active;
+ if b<>30 or w<>31 then raise exception 'Roster verification failed: Blue %, White %',b,w; end if;
+end $$;
