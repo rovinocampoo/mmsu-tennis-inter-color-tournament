@@ -8,7 +8,8 @@ export function validateAdvantageSet({blue,white}:MatchScore):{valid:boolean;win
  if(!Number.isInteger(blue)||!Number.isInteger(white)||blue<0||white<0)return {valid:false,winner:null,message:"Enter whole-number game scores."};
  if(blue===white)return {valid:false,winner:null,message:"A completed set cannot be tied."};
  const high=Math.max(blue,white),low=Math.min(blue,white);
- if(high<8||high-low<2)return {valid:false,winner:null,message:"A team must reach at least 8 games and lead by 2."};
+ if(high===8&&low===7)return {valid:true,winner:blue>white?"blue":"white",message:"Valid 7–7 tiebreak result."};
+ if(high<8||high-low<2)return {valid:false,winner:null,message:"A team must reach at least 8 games and lead by 2, except 8–7 which is decided by a tiebreak."};
  return {valid:true,winner:blue>white?"blue":"white",message:"Valid 8-game advantage-set result."};
 }
 export type CompletedScore = {status:string;blue:number;white:number};
