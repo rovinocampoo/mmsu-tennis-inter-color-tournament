@@ -1,89 +1,213 @@
-const sections: [string, string[]][] = [
-  [
-    "Team composition",
-    [
-      "Two teams: Team Blue, led by Ms. Chloe Castro, and Team White, led by Engr. Kathleen Flojo.",
-    ],
-  ],
-  [
-    "Categories",
-    [
-      "Class A",
-      "Class B",
-      "Beginners",
-      "Categories may adjust depending on player availability. A player may play multiple times for their team.",
-    ],
-  ],
-  [
-    "Match format",
-    [
-      "Doubles only (2 vs. 2).",
-      "One 8-game advantage set. A team must win by two games.",
-      "No automatic tiebreak unless the committee confirms one.",
-    ],
-  ],
-  [
-    "Scoring",
-    [
-      "All games from every match played on a given day are totalled to produce that day’s aggregate score.",
-      "Overall championship point calculation is pending committee confirmation. Daily aggregate games must not be treated as championship points.",
-    ],
-  ],
-  [
-    "Match rules",
-    [
-      "ITF rules apply, with local adaptations if needed.",
-      "Warm-up: 5 minutes maximum before each match.",
-      "Players must be present 10 minutes before scheduled match time.",
-      "No coaching during play. Respect officials and opponents.",
-    ],
-  ],
-  [
-    "Attire & conduct",
-    [
-      "Players must wear their team color on December 8 and proper tennis attire.",
-      "Maintain sportsmanship and fair play. No abusive language or behavior.",
-      "Disputes are resolved by the Tournament Committee, whose decision is final.",
-    ],
-  ],
-  [
-    "Schedule",
-    [
-      "Tournament dates and match order may be announced in advance or on the spot, subject to player availability and match balance.",
-      "Weekday matches start at 5:00 PM onwards, or earlier if all scheduled players are present.",
-    ],
-  ],
-];
-export default function Rules() {
+import Link from "next/link";
+import { supabasePublic } from "@/lib/supabase/server";
+
+export const revalidate = 30;
+
+type MatchResult = {
+  id: string;
+  match_number: number;
+  match_date: string;
+  category: string;
+  match_scores: {
+    blue_games: number;
+    white_games: number;
+  }[];
+  match_players: {
+    team_id: string;
+    players: {
+      full_name: string;
+    }[];
+    teams: {
+      name: string;
+    }[];
+  }[];
+  match_results: {
+    winning_team_id: string;
+  }[];
+};
+
+type DailyAggregate = {
+  blue_games: number;
+  white_games: number;
+  completed_matches: number;
+};
+
+export default async function Results({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
+  const params = await searchParams;
+  const selectedDate = params.date;
+  const db = supabasePublic();
+
+  let matches: MatchResult[] = [];
+  let daily: DailyAggregate | null = null;
+
+  if (db) {
+    let query = db
+      .from("matches")
+      .select(
+        "id,match_number,match_date,category,match_scores(blue_games,white_games),match_players(team_id,players(full_name),teams(name)),match_results(winning_team_id)",
+      )
+      .eq("status", "completed")
+      .eq("published", true)
+      .order("match_date", { ascending: false });
+
+    if (selectedDate) {
+      query = query.eq("match_date", selectedDate);
+    }
+
+    const [matchResult, dailyResult] = await Promise.all([
+      query,
+      selectedDate
+        ? db
+            .from("daily_aggregate_scores")
+            .select("*")
+            .eq("match_date", selectedDate)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    matches = (matchResult.data ?? []) as MatchResult[];
+    daily = dailyResult.data as DailyAggregate | null;
+  }
+
   return (
-    <main className="shell" style={{ paddingTop: 44, maxWidth: 900 }}>
-      <div className="eyebrow">THE GAME PLAN</div>
-      <h1 style={{ fontSize: 42, letterSpacing: "-.05em", margin: "10px 0" }}>
-        Tournament rules
+    <main className="shell" style={{ paddingTop: 44 }}>
+      <div className="eyebrow">OFFICIAL MATCH RECORDS</div>
+
+      <h1
+        style={{
+          fontSize: 42,
+          letterSpacing: "-.05em",
+          margin: "10px 0",
+        }}
+      >
+        Results & daily totals
       </h1>
-      <p style={{ color: "var(--muted)" }}>
-        MMSU Tennis Club Inter-Color Tournament · Season 2 · November 11 –
-        December 8, 2026
+
+      <p style={{ color: "var(--muted)", maxWidth: 680 }}>
+        Each match result is shown individually. Daily aggregate scores combine
+        games from every completed match on the same date.
       </p>
-      <div style={{ display: "grid", gap: 12, marginTop: 26 }}>
-        {sections.map(([title, items]) => (
-          <section className="panel" key={title} style={{ padding: 22 }}>
-            <h2 style={{ fontSize: 20, margin: "0 0 12px" }}>{title}</h2>
-            <ul
-              style={{
-                margin: 0,
-                paddingLeft: 20,
-                color: "#56675c",
-                lineHeight: 1.8,
-              }}
-            >
-              {(items as string[]).map((x) => (
-                <li key={x}>{x}</li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+
+      {selectedDate && (
+        <div className="panel" style={{ padding: 20, marginTop: 18 }}>
+          <div className="eyebrow">DAILY AGGREGATE · {selectedDate}</div>
+
+          <div
+            style={{
+              fontSize: 40,
+              fontWeight: 900,
+              marginTop: 8,
+            }}
+          >
+            {daily ? daily.blue_games + " – " + daily.white_games : "0 – 0"}
+          </div>
+
+          <div style={{ fontSize: 12, color: "var(--muted)" }}>
+            {daily?.completed_matches ?? 0} completed matches included
+          </div>
+
+          <Link
+            href="/calendar"
+            style={{
+              fontSize: 12,
+              textDecoration: "underline",
+              display: "inline-block",
+              marginTop: 10,
+            }}
+          >
+            Back to calendar
+          </Link>
+        </div>
+      )}
+
+      {matches.length ? (
+        <div style={{ display: "grid", gap: 14, marginTop: 24 }}>
+          {matches.map((match) => {
+            const score = match.match_scores?.[0];
+
+            const bluePlayers = match.match_players
+              ?.filter((player) =>
+                player.teams?.[0]?.name?.toLowerCase().includes("blue"),
+              )
+              .map((player) => player.players?.[0]?.full_name)
+              .filter((name): name is string => Boolean(name));
+
+            const whitePlayers = match.match_players
+              ?.filter((player) =>
+                player.teams?.[0]?.name?.toLowerCase().includes("white"),
+              )
+              .map((player) => player.players?.[0]?.full_name)
+              .filter((name): name is string => Boolean(name));
+
+            return (
+              <article className="panel" key={match.id} style={{ padding: 20 }}>
+                <div className="eyebrow">
+                  {match.match_date} · MATCH {match.match_number} ·{" "}
+                  {match.category}
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto 1fr",
+                    gap: 12,
+                    alignItems: "center",
+                    marginTop: 12,
+                  }}
+                >
+                  <div>
+                    <b>Team Blue</b>
+
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--muted)",
+                        marginTop: 5,
+                      }}
+                    >
+                      {bluePlayers.join(" & ")}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 30, fontWeight: 900 }}>
+                    {score?.blue_games ?? "–"} : {score?.white_games ?? "–"}
+                  </div>
+
+                  <div style={{ textAlign: "right" }}>
+                    <b>Team White</b>
+
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--muted)",
+                        marginTop: 5,
+                      }}
+                    >
+                      {whitePlayers.join(" & ")}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div
+          className="panel"
+          style={{
+            padding: 24,
+            marginTop: 24,
+            color: "var(--muted)",
+          }}
+        >
+          No completed match results {selectedDate ? "for this date" : "yet"}.
+          The scoreboard updates after an organizer records a valid result.
+        </div>
+      )}
     </main>
   );
 }

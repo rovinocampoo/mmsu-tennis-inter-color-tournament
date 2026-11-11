@@ -1,10 +1,200 @@
-import {NextResponse} from "next/server";
-import {z} from "zod";
-import {supabaseAdmin} from "@/lib/supabase/server";
-import {isOrganizerAuthenticated} from "@/lib/organizer-auth";
-const schema=z.object({date:z.string(),category:z.enum(["Class A","Class B","Beginners"]),time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),court:z.string().max(80).optional(),blue:z.array(z.string().uuid()).length(2),white:z.array(z.string().uuid()).length(2),notes:z.string().max(500).optional(),overrideReason:z.string().max(300).optional()});
-export async function POST(req:Request){if(!await isOrganizerAuthenticated())return NextResponse.json({error:"Organizer session required."},{status:401});const parsed=schema.safeParse(await req.json().catch(()=>null));if(!parsed.success)return NextResponse.json({error:"Complete all four player slots and match details."},{status:400});const v=parsed.data;if(v.date<"2026-11-11"||v.date>"2026-12-08")return NextResponse.json({error:"Date must be within the tournament."},{status:400});const db=supabaseAdmin();if(!db)return NextResponse.json({error:"Database not configured."},{status:503});const ids=[...v.blue,...v.white];if(new Set(ids).size!==4)return NextResponse.json({error:"Each match needs four different players."},{status:400});const {data:players}=await db.from("players").select("id,team_id,full_name,teams(name)").in("id",ids).eq("active",true);if(!players||players.length!==4)return NextResponse.json({error:"One or more players are not active in the roster."},{status:400});const bp=players.filter((p:any)=>p.teams?.name==="Team Blue"),wp=players.filter((p:any)=>p.teams?.name==="Team White");if(bp.length!==2||wp.length!==2||!v.blue.every(id=>bp.some((p:any)=>p.id===id))||!v.white.every(id=>wp.some((p:any)=>p.id===id)))return NextResponse.json({error:"Choose exactly two players from each correct team."},{status:400});
-const {data:availability}=await db.from("availability").select("player_id,status").eq("availability_date",v.date).in("player_id",ids);const unavailable=ids.filter(id=>availability?.find(a=>a.player_id===id)?.status!=="available");if(unavailable.length&&!v.overrideReason)return NextResponse.json({error:"A player is unavailable or has not responded. Enter an override reason to proceed."},{status:409});
-const {data:existing}=await db.from("matches").select("match_number").eq("match_date",v.date).order("match_number",{ascending:false}).limit(1).maybeSingle();const number=(existing?.match_number??0)+1;const {data:match,error}=await db.from("matches").insert({match_date:v.date,match_number:number,category:v.category,scheduled_time:v.time,court:v.court||null,notes:v.notes||null,status:"scheduled",published:false}).select("id").single();if(error||!match)return NextResponse.json({error:"Could not create match."},{status:500});
-const rows=players.map((p:any)=>({match_id:match.id,player_id:p.id,team_id:p.team_id,pair_position:(p.teams.name==="Team Blue"?v.blue:v.white).indexOf(p.id)+1}));const {error:insertError}=await db.from("match_players").insert(rows);if(insertError){await db.from("matches").delete().eq("id",match.id);return NextResponse.json({error:"Could not save doubles pairs."},{status:500});}
-await db.from("organizer_activity_logs").insert({action:"match_created",entity_type:"match",entity_id:match.id,description:"Created Match "+number+" for "+v.date,reason:v.overrideReason||null});return NextResponse.json({ok:true,matchId:match.id,matchNumber:number});}
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { supabaseAdmin } from "@/lib/supabase/server";
+import { isOrganizerAuthenticated } from "@/lib/organizer-auth";
+
+const schema = z.object({
+  date: z.string(),
+  category: z.enum(["Class A", "Class B", "Beginners"]),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  court: z.string().max(80).optional(),
+  blue: z.array(z.string().uuid()).length(2),
+  white: z.array(z.string().uuid()).length(2),
+  notes: z.string().max(500).optional(),
+  overrideReason: z.string().max(300).optional(),
+});
+
+type Player = {
+  id: string;
+  team_id: string;
+  full_name: string;
+  teams: {
+    name: string;
+  }[];
+};
+
+type Availability = {
+  player_id: string;
+  status: string;
+};
+
+export async function POST(req: Request) {
+  if (!(await isOrganizerAuthenticated())) {
+    return NextResponse.json(
+      { error: "Organizer session required." },
+      { status: 401 },
+    );
+  }
+
+  const parsed = schema.safeParse(await req.json().catch(() => null));
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Complete all four player slots and match details." },
+      { status: 400 },
+    );
+  }
+
+  const value = parsed.data;
+
+  if (value.date < "2026-11-11" || value.date > "2026-12-08") {
+    return NextResponse.json(
+      { error: "Date must be within the tournament." },
+      { status: 400 },
+    );
+  }
+
+  const db = supabaseAdmin();
+
+  if (!db) {
+    return NextResponse.json(
+      { error: "Database not configured." },
+      { status: 503 },
+    );
+  }
+
+  const ids = [...value.blue, ...value.white];
+
+  if (new Set(ids).size !== 4) {
+    return NextResponse.json(
+      { error: "Each match needs four different players." },
+      { status: 400 },
+    );
+  }
+
+  const { data: playerData, error: playersError } = await db
+    .from("players")
+    .select("id,team_id,full_name,teams(name)")
+    .in("id", ids)
+    .eq("active", true);
+
+  if (playersError || !playerData || playerData.length !== 4) {
+    return NextResponse.json(
+      { error: "One or more players are not active in the roster." },
+      { status: 400 },
+    );
+  }
+
+  const players = playerData as Player[];
+
+  const bluePlayers = players.filter(
+    (player) => player.teams?.[0]?.name === "Team Blue",
+  );
+  const whitePlayers = players.filter(
+    (player) => player.teams?.[0]?.name === "Team White",
+  );
+
+  if (
+    bluePlayers.length !== 2 ||
+    whitePlayers.length !== 2 ||
+    !value.blue.every((id) => bluePlayers.some((player) => player.id === id)) ||
+    !value.white.every((id) => whitePlayers.some((player) => player.id === id))
+  ) {
+    return NextResponse.json(
+      { error: "Choose exactly two players from each correct team." },
+      { status: 400 },
+    );
+  }
+
+  const { data: availabilityData } = await db
+    .from("availability")
+    .select("player_id,status")
+    .eq("availability_date", value.date)
+    .in("player_id", ids);
+
+  const availability = (availabilityData ?? []) as Availability[];
+
+  const unavailable = ids.filter(
+    (id) =>
+      availability.find((entry) => entry.player_id === id)?.status !==
+      "available",
+  );
+
+  if (unavailable.length && !value.overrideReason) {
+    return NextResponse.json(
+      {
+        error:
+          "A player is unavailable or has not responded. Enter an override reason to proceed.",
+      },
+      { status: 409 },
+    );
+  }
+
+  const { data: existing } = await db
+    .from("matches")
+    .select("match_number")
+    .eq("match_date", value.date)
+    .order("match_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const number = (existing?.match_number ?? 0) + 1;
+
+  const { data: match, error } = await db
+    .from("matches")
+    .insert({
+      match_date: value.date,
+      match_number: number,
+      category: value.category,
+      scheduled_time: value.time,
+      court: value.court || null,
+      notes: value.notes || null,
+      status: "scheduled",
+      published: false,
+    })
+    .select("id")
+    .single();
+
+  if (error || !match) {
+    return NextResponse.json(
+      { error: "Could not create match." },
+      { status: 500 },
+    );
+  }
+
+  const rows = players.map((player) => ({
+    match_id: match.id,
+    player_id: player.id,
+    team_id: player.team_id,
+    pair_position:
+      (player.teams?.[0]?.name === "Team Blue"
+        ? value.blue
+        : value.white
+      ).indexOf(player.id) + 1,
+  }));
+
+  const { error: insertError } = await db.from("match_players").insert(rows);
+
+  if (insertError) {
+    await db.from("matches").delete().eq("id", match.id);
+
+    return NextResponse.json(
+      { error: "Could not save doubles pairs." },
+      { status: 500 },
+    );
+  }
+
+  await db.from("organizer_activity_logs").insert({
+    action: "match_created",
+    entity_type: "match",
+    entity_id: match.id,
+    description: `Created Match ${number} for ${value.date}`,
+    reason: value.overrideReason || null,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    matchId: match.id,
+    matchNumber: number,
+  });
+}
