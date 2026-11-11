@@ -11,7 +11,7 @@ type MatchResult = {
   match_scores: {
     blue_games: number;
     white_games: number;
-  }[];
+  } | null;
   match_players: {
     players: {
       full_name: string;
@@ -120,7 +120,9 @@ export default async function Results({
       {matches.length ? (
         <div style={{ display: "grid", gap: 14, marginTop: 24 }}>
           {matches.map((match) => {
-            const score = match.match_scores[0];
+            const score = Array.isArray(match.match_scores)
+              ? match.match_scores[0]
+              : match.match_scores;
 
             const bluePlayers = match.match_players
               .filter((player) =>
@@ -167,7 +169,7 @@ export default async function Results({
                   </div>
 
                   <div style={{ fontSize: 30, fontWeight: 900 }}>
-                    {score?.blue_games ?? "–"} : {score?.white_games ?? "–"}
+                    {score?.blue_games ?? "—"} : {score?.white_games ?? "—"}
                   </div>
 
                   <div style={{ textAlign: "right" }}>
