@@ -73,12 +73,12 @@ begin
 end $$;
 drop trigger if exists availability_schedule_change on public.availability;
 create trigger availability_schedule_change before insert or update on public.availability for each row execute function public.flag_availability_schedule_change();
-create or replace view public.daily_aggregate_scores as
+create or replace view public.daily_aggregate_scores with (security_invoker=true) as
 select m.match_date,coalesce(sum(s.blue_games),0)::integer as blue_games,
  coalesce(sum(s.white_games),0)::integer as white_games,count(*)::integer as completed_matches
 from public.matches m join public.match_scores s on s.match_id=m.id
 where m.status='completed' group by m.match_date;
-create or replace view public.player_match_statistics as
+create or replace view public.player_match_statistics with (security_invoker=true) as
 select p.id as player_id,p.full_name,t.name as team_name,
  count(distinct m.id)::integer as matches_played,
  count(distinct m.id) filter(where (t.name='Team Blue' and r.winning_team_id=(select id from public.teams where name='Team Blue')) or (t.name='Team White' and r.winning_team_id=(select id from public.teams where name='Team White')))::integer as wins,
@@ -114,3 +114,8 @@ drop policy if exists "Public read published results" on public.match_results;
 create policy "Public read published results" on public.match_results for select to anon,authenticated using(exists(select 1 from public.matches m where m.id=match_id and m.published=true));
 drop policy if exists "Public read tournament settings" on public.tournament_settings;
 create policy "Public read tournament settings" on public.tournament_settings for select to anon,authenticated using(true);
+
+-- Correction history is private; organizer routes access it with the server-only service role.
+alter table public.match_result_history enable row level security;
+revoke all on public.organizer_activity_logs from anon, authenticated;
+revoke all on public.match_result_history from anon, authenticated;
