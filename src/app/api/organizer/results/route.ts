@@ -11,9 +11,7 @@ const schema = z.object({
   reason: z.string().max(400).optional(),
 });
 
-type MatchPlayer = {
-  teams: { name: string } | null;
-};
+type MatchPlayer = { team_id: string };
 
 export async function POST(req: Request) {
   if (!(await isOrganizerAuthenticated())) {
@@ -53,7 +51,7 @@ export async function POST(req: Request) {
 
   const { data: match, error: matchError } = await db
     .from("matches")
-    .select("id,match_number,match_players(teams(name))")
+    .select("id,match_number")
     .eq("id", v.matchId)
     .maybeSingle();
 
@@ -68,15 +66,39 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Match not found." }, { status: 404 });
   }
 
-  const mp = (match.match_players ?? []) as unknown as MatchPlayer[];
+  const { data: matchPlayers, error: playersError } = await db
+    .from("match_players")
+    .select("team_id")
+    .eq("match_id", v.matchId);
 
+  if (playersError) {
+    return NextResponse.json(
+      { error: "Could not retrieve doubles pair assignments." },
+      { status: 500 },
+    );
+  }
+
+  const teamIds = [...new Set(((matchPlayers ?? []) as MatchPlayer[]).map((p) => p.team_id))];
+  const { data: assignedTeams, error: assignedTeamsError } = await db
+    .from("teams")
+    .select("id,name")
+    .in("id", teamIds);
+
+  if (assignedTeamsError) {
+    return NextResponse.json(
+      { error: "Could not retrieve team assignments." },
+      { status: 500 },
+    );
+  }
+
+  const teamNames = (assignedTeams ?? []).map((team) => team.name);
   if (
-    mp.length !== 4 ||
-    mp.filter((p) => p.teams?.name === "Team Blue").length !== 2 ||
-    mp.filter((p) => p.teams?.name === "Team White").length !== 2
+    matchPlayers?.length !== 4 ||
+    teamNames.filter((name) => name === "Team Blue").length !== 1 ||
+    teamNames.filter((name) => name === "Team White").length !== 1
   ) {
     return NextResponse.json(
-      { error: "Invalid doubles pairs." },
+      { error: "Invalid doubles pairs. A match needs two players per team." },
       { status: 409 },
     );
   }
