@@ -53,7 +53,7 @@ export default function ShareHeadToHeadButton({
         <circle cx="1080" cy="62" r="190" fill="#ffffff" opacity=".045"/>
         <circle cx="80" cy="300" r="130" fill="#d9f36a" opacity=".08"/>
         <text x="78" y="78" font-family="Arial" font-size="20" font-weight="800" letter-spacing="5" fill="#d9f36a">MMSU TENNIS CLUB</text>
-        <text x="78" y="170" font-family="Arial" font-size="68" font-weight="900" fill="#ffffff">COLOR CLASH!</text>
+        <text x="78" y="170" font-family="Arial" font-size="68" font-weight="900" fill="#ffffff">INTER-COLOR TOURNAMENT</text>
         <text x="82" y="220" font-family="Arial" font-size="24" font-weight="700" fill="#e1eadf">THE HEAD-TO-HEAD SO FAR</text>
         <rect x="82" y="254" width="300" height="46" rx="23" fill="#d9f36a"/>
         <text x="232" y="284" text-anchor="middle" font-family="Arial" font-size="17" font-weight="900" fill="#123d2c">TOURNAMENT SNAPSHOT</text>
