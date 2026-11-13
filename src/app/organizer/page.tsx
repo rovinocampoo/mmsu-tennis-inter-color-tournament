@@ -61,8 +61,8 @@ export default async function Organizer() {
         db
           .from("matches")
           .select("id,match_number,match_date,category,status,published")
-          .order("match_date")
-          .order("match_number"),
+          .order("match_date", { ascending: false })
+          .order("match_number", { ascending: true }),
         db.from("players").select("id", { count: "exact", head: true }),
         db
           .from("availability")
