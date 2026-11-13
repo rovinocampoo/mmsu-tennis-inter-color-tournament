@@ -6,7 +6,7 @@ import { isOrganizerAuthenticated } from "@/lib/organizer-auth";
 const schema = z.object({
   date: z.string(),
   category: z.enum(["Class A", "Class B", "Beginners"]),
-  time: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   court: z.string().max(80).optional(),
   blue: z.array(z.string().uuid()).length(2),
   white: z.array(z.string().uuid()).length(2),
