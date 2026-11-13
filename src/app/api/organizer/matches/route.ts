@@ -149,7 +149,6 @@ export async function POST(req: Request) {
   const { data: existing } = await db
     .from("matches")
     .select("match_number")
-    .eq("match_date", value.date)
     .order("match_number", { ascending: false })
     .limit(1)
     .maybeSingle();
