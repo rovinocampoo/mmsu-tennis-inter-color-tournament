@@ -46,7 +46,7 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
       .order("scheduled_time");
 
     const allPublishedMatches = (matchData ?? []) as MatchRow[];
-    const dateCounts = allPublishedMatches.reduce<Record<string, number>>((counts, match) => {
+    dateCounts = allPublishedMatches.reduce<Record<string, number>>((counts, match) => {
       counts[match.match_date] = (counts[match.match_date] ?? 0) + 1;
       return counts;
     }, {});
