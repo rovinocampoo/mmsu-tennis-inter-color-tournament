@@ -28,7 +28,9 @@ function formatDate(date: string) {
   });
 }
 
-export default async function Schedule() {
+export default async function Schedule({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+  const params = await searchParams;
+  const selectedDate = params.date;
   const db = supabasePublic();
   let matches: ScheduleMatch[] = [];
 
@@ -40,7 +42,9 @@ export default async function Schedule() {
       .order("match_date")
       .order("scheduled_time");
 
-    const publishedMatches = (matchData ?? []) as MatchRow[];
+    const publishedMatches = ((matchData ?? []) as MatchRow[]).filter(
+      (match) => !selectedDate || match.match_date === selectedDate,
+    );
     const matchIds = publishedMatches.map((match) => match.id);
 
     if (matchIds.length) {
@@ -86,6 +90,7 @@ export default async function Schedule() {
       </h1>
       <p style={{ color: "var(--muted)" }}>
         Only matches published by the tournament organizers appear here.
+        {selectedDate ? ` Showing ${formatDate(selectedDate)}.` : ""}
       </p>
 
       {dates.length ? (
