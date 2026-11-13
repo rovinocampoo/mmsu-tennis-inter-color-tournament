@@ -19,7 +19,7 @@ export default async function Results({ searchParams }: { searchParams: Promise<
   let matches: MatchRow[] = [];
   let dateCounts: Record<string, number> = {};
   let daily: DailyAggregate | null = null;
-  let shareRows: { match_number: number; blue_games: number; white_games: number; blue_players: string[]; white_players: string[] }[] = [];
+  let shareRows: { match_id: string; match_number: number; blue_games: number; white_games: number; blue_players: string[]; white_players: string[] }[] = [];
   let blueTotal = 0;
   let whiteTotal = 0;
 
@@ -53,6 +53,7 @@ export default async function Results({ searchParams }: { searchParams: Promise<
         const score = scores.find((s) => s.match_id === match.id);
         const matchAssignments = assignments.filter((a) => a.match_id === match.id);
         return {
+          match_id: match.id,
           match_number: match.match_number,
           blue_games: score?.blue_games ?? 0,
           white_games: score?.white_games ?? 0,
@@ -69,8 +70,8 @@ export default async function Results({ searchParams }: { searchParams: Promise<
       daily = data as DailyAggregate | null;
       if (!selectedDate) {
         const dailyMatches = matches.filter((match) => match.match_date === shareDate);
-        const dailyNumbers = new Set(dailyMatches.map((match) => match.match_number));
-        shareRows = shareRows.filter((row) => dailyNumbers.has(row.match_number));
+        const dailyIds = new Set(dailyMatches.map((match) => match.id));
+        shareRows = shareRows.filter((row) => dailyIds.has(row.match_id));
       }
     }
   }
@@ -108,7 +109,7 @@ export default async function Results({ searchParams }: { searchParams: Promise<
       {matches.length ? (
         <div style={{ display: "grid", gap: 14, marginTop: 24 }}>
           {matches.map((match) => {
-            const row = shareRows.find((r) => r.match_number === match.match_number);
+            const row = shareRows.find((r) => r.match_id === match.id);
             return (
               <article className="panel" key={match.id} style={{ padding: 20 }}>
                 <div className="eyebrow">{match.match_date} · MATCH {match.match_number} · {match.category}</div>
