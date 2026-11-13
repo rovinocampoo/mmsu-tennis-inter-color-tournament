@@ -1,4 +1,5 @@
 import Link from "next/link";
+import DateCalendar from "@/components/date-calendar";
 import { supabasePublic } from "@/lib/supabase/server";
 import ShareResultsButton from "./share-results-button";
 
@@ -16,17 +17,21 @@ export default async function Results({ searchParams }: { searchParams: Promise<
   const selectedDate = params.date;
   const db = supabasePublic();
   let matches: MatchRow[] = [];
+  let dateCounts: Record<string, number> = {};
   let daily: DailyAggregate | null = null;
   let shareRows: { match_number: number; blue_games: number; white_games: number; blue_players: string[]; white_players: string[] }[] = [];
   let blueTotal = 0;
   let whiteTotal = 0;
 
   if (db) {
-    let matchQuery = db.from("matches").select("id,match_number,match_date,category")
-      .eq("status", "completed").eq("published", true).order("match_date", { ascending: false }).order("match_number", { ascending: false });
-    if (selectedDate) matchQuery = matchQuery.eq("match_date", selectedDate);
-    const { data: matchData } = await matchQuery;
-    matches = (matchData ?? []) as MatchRow[];
+    const { data: matchData } = await db.from("matches").select("id,match_number,match_date,category")
+      .eq("status", "completed").eq("published", true).order("match_date", { ascending: false }).order("match_number", { ascending: true });
+    const allCompletedMatches = (matchData ?? []) as MatchRow[];
+    dateCounts = allCompletedMatches.reduce<Record<string, number>>((counts, match) => {
+      counts[match.match_date] = (counts[match.match_date] ?? 0) + 1;
+      return counts;
+    }, {});
+    matches = allCompletedMatches.filter((match) => !selectedDate || match.match_date === selectedDate);
 
     const matchIds = matches.map((m) => m.id);
     if (matchIds.length) {
@@ -75,6 +80,12 @@ export default async function Results({ searchParams }: { searchParams: Promise<
       <div className="eyebrow">OFFICIAL MATCH RECORDS</div>
       <h1 style={{ fontSize: 42, letterSpacing: "-.05em", margin: "10px 0" }}>Results & daily totals</h1>
       <p style={{ color: "var(--muted)", maxWidth: 680 }}>Individual doubles match results and daily aggregate games. Daily totals are the sum of all completed matches on that date.</p>
+      <DateCalendar basePath="/results" selectedDate={selectedDate} counts={dateCounts} label="Completed matches" />
+      {selectedDate && (
+        <div style={{ marginTop: 16 }}>
+          <Link href="/results" style={{ textDecoration: "underline", fontSize: 13 }}>← Show all results dates</Link>
+        </div>
+      )}
       {matches.length > 0 && (
         <div className="panel" style={{ padding: 20, marginTop: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
