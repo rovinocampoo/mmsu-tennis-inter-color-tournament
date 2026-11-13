@@ -1,4 +1,5 @@
 import { supabasePublic } from "@/lib/supabase/server";
+import ShareHeadToHeadButton from "./share-head-to-head-button";
 
 export const revalidate = 60;
 
@@ -61,6 +62,12 @@ export default async function Standings() {
       <section style={{ marginTop: 30 }}>
         <div className="eyebrow">TEAM COMPARISON</div>
         <h2 style={{ fontSize: 26, margin: "7px 0 14px" }}>Head-to-head record</h2>
+        <ShareHeadToHeadButton
+          blue={{ name: "Team Blue", played: teamStats.find((team) => team.name === "Team Blue")?.played ?? 0, wins: teamStats.find((team) => team.name === "Team Blue")?.wins ?? 0, losses: teamStats.find((team) => team.name === "Team Blue")?.losses ?? 0, games: blueGames }}
+          white={{ name: "Team White", played: teamStats.find((team) => team.name === "Team White")?.played ?? 0, wins: teamStats.find((team) => team.name === "Team White")?.wins ?? 0, losses: teamStats.find((team) => team.name === "Team White")?.losses ?? 0, games: whiteGames }}
+          completedMatches={matches}
+          totalGames={totalGames}
+        />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 14 }}>
           {teamStats.map((team) => {
             const blue = team.name === "Team Blue";
