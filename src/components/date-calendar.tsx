@@ -41,7 +41,8 @@ export default function DateCalendar({
         {months.map((month) => {
           const [year, monthNumber] = month.split("-").map(Number);
           const monthDates = dates.filter((date) => date.startsWith(month));
-          const offset = (new Date(Date.UTC(year, monthNumber - 1, 1, 12)).getUTCDay() + 6) % 7;
+          const firstDisplayedDate = new Date(monthDates[0] + "T12:00:00Z");
+          const offset = (firstDisplayedDate.getUTCDay() + 6) % 7;
           const cells: (string | null)[] = [...Array.from({ length: offset }, () => null), ...monthDates];
           while (cells.length % 7) cells.push(null);
           return (
