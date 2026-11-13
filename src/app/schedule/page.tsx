@@ -42,8 +42,8 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
       .from("matches")
       .select("id,match_number,match_date,scheduled_time,court,category,status")
       .eq("published", true)
-      .order("match_date")
-      .order("scheduled_time");
+      .order("match_date", { ascending: false })
+      .order("scheduled_time", { ascending: true });
 
     const allPublishedMatches = (matchData ?? []) as MatchRow[];
     dateCounts = allPublishedMatches.reduce<Record<string, number>>((counts, match) => {
@@ -146,7 +146,7 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
         ))
       ) : (
         <div className="panel" style={{ padding: 24, marginTop: 24, color: "var(--muted)" }}>
-          No matches have been published yet.
+          {selectedDate ? "No published matches for this date." : "No matches have been published yet."}
         </div>
       )}
     </main>
