@@ -1,4 +1,8 @@
 "use client";
+
+import type { FormEvent } from "react";
+import { useMemo, useState } from "react";
+
 type Player = {
   id: string;
   full_name: string;
@@ -18,8 +22,125 @@ type DraftMatch = {
   category: string;
   published: boolean;
 };
-import type { FormEvent } from "react";
-import { useState } from "react";
+
+function PlayerCombobox({
+  team,
+  slot,
+  players,
+  value,
+  selectedIds,
+  onChange,
+}: {
+  team: "Blue" | "White";
+  slot: number;
+  players: Player[];
+  value: string;
+  selectedIds: string[];
+  onChange: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const selected = players.find((player) => player.id === value);
+  const sortedPlayers = useMemo(
+    () => players.filter((player) => player.active).slice().sort((a, b) =>
+      a.full_name.localeCompare(b.full_name, "en", { sensitivity: "base" }),
+    ),
+    [players],
+  );
+  const filtered = sortedPlayers.filter((player) => {
+    const matchesQuery = player.full_name.toLowerCase().includes(query.trim().toLowerCase());
+    const notSelectedElsewhere = player.id === value || !selectedIds.includes(player.id);
+    return matchesQuery && notSelectedElsewhere;
+  });
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        className="field"
+        type="text"
+        role="combobox"
+        aria-label={`Choose Team ${team} player ${slot}`}
+        aria-autocomplete="list"
+        aria-expanded={open}
+        placeholder={`Type to search Team ${team} player ${slot}…`}
+        value={open ? query : selected?.full_name ?? ""}
+        onFocus={() => {
+          setQuery("");
+          setOpen(true);
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+          if (value) onChange("");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setOpen(false);
+          if (event.key === "Enter" && filtered.length) {
+            event.preventDefault();
+            onChange(filtered[0].id);
+            setQuery("");
+            setOpen(false);
+          }
+        }}
+        onBlur={() => {
+          window.setTimeout(() => setOpen(false), 150);
+        }}
+      />
+      {open && (
+        <div
+          role="listbox"
+          style={{
+            position: "absolute",
+            zIndex: 30,
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            maxHeight: 230,
+            overflowY: "auto",
+            background: "var(--panel, white)",
+            border: "1px solid var(--line)",
+            borderRadius: 10,
+            boxShadow: "0 12px 30px #0002",
+          }}
+        >
+          {filtered.length ? filtered.map((player) => (
+            <button
+              key={player.id}
+              type="button"
+              role="option"
+              aria-selected={player.id === value}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onChange(player.id);
+                setQuery("");
+                setOpen(false);
+              }}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "10px 12px",
+                border: 0,
+                borderBottom: "1px solid var(--line)",
+                background: player.id === value ? "var(--surface, #eef3e9)" : "transparent",
+                color: "inherit",
+                textAlign: "left",
+                cursor: "pointer",
+                font: "inherit",
+              }}
+            >
+              {player.full_name}
+            </button>
+          )) : (
+            <div style={{ padding: 12, color: "var(--muted)", fontSize: 13 }}>
+              No matching players.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MatchBuilder({
   teams,
   matches,
@@ -36,62 +157,53 @@ export default function MatchBuilder({
     [reason, setReason] = useState(""),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
-  const b = teams.find((t) => t.name === "Team Blue")?.players ?? [],
-    w = teams.find((t) => t.name === "Team White")?.players ?? [];
-  const selects = (
-    team: string,
+
+  const b = teams.find((team) => team.name === "Team Blue")?.players ?? [];
+  const w = teams.find((team) => team.name === "Team White")?.players ?? [];
+  const selectedIds = [...blue, ...white].filter(Boolean);
+
+  function updateSelection(
     values: string[],
-    set: (x: string[]) => void,
-    players: Player[],
-  ) =>
-    values.map((v, i) => (
-      <select
-        key={i}
-        className="field"
-        required
-        value={v}
-        onChange={(e) =>
-          set(values.map((x, j) => (j === i ? e.target.value : x)))
-        }
-      >
-        <option value="">
-          Choose {team} player {i + 1}
-        </option>
-        {players
-          .filter((p) => p.active)
-          .map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.full_name}
-            </option>
-          ))}
-      </select>
-    ));
-  async function create(e: FormEvent) {
-    e.preventDefault();
+    setValues: (next: string[]) => void,
+    index: number,
+    id: string,
+  ) {
+    setValues(values.map((current, i) => i === index ? id : current));
+  }
+
+  async function create(event: FormEvent) {
+    event.preventDefault();
     setBusy(true);
     setMessage("");
-    const r = await fetch("/api/organizer/matches", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        date,
-        category,
-        time,
-        court,
-        blue,
-        white,
-        overrideReason: reason || undefined,
-      }),
-    });
-    const j = await r.json();
-    setMessage(
-      r.ok
-        ? "Match " + j.matchNumber + " created as a draft."
-        : j.error || "Unable to create match.",
-    );
-    if (r.ok) location.reload();
-    setBusy(false);
+
+    try {
+      const response = await fetch("/api/organizer/matches", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          date,
+          category,
+          time,
+          court,
+          blue,
+          white,
+          overrideReason: reason || undefined,
+        }),
+      });
+      const result = await response.json();
+      setMessage(
+        response.ok
+          ? "Match " + result.matchNumber + " created as a draft."
+          : result.error || "Unable to create match.",
+      );
+      if (response.ok) location.reload();
+    } catch {
+      setMessage("Unable to create match. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
+
   return (
     <section className="panel" style={{ padding: 22, marginTop: 18 }}>
       <h2 style={{ marginTop: 0 }}>Manual match builder</h2>
@@ -111,113 +223,108 @@ export default function MatchBuilder({
               min="2026-11-11"
               max="2026-12-08"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(event) => setDate(event.target.value)}
             />
           </label>
           <label className="eyebrow">
             CATEGORY
-            <select
-              className="field"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {["Class A", "Class B", "Beginners"].map((x) => (
-                <option key={x}>{x}</option>
-              ))}
+            <select className="field" value={category} onChange={(event) => setCategory(event.target.value)}>
+              {["Class A", "Class B", "Beginners"].map((item) => <option key={item}>{item}</option>)}
             </select>
           </label>
           <label className="eyebrow">
             TIME
-            <input
-              className="field"
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-            />
+            <input className="field" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
           </label>
           <label className="eyebrow">
             COURT
-            <input
-              className="field"
-              value={court}
-              onChange={(e) => setCourt(e.target.value)}
-            />
+            <input className="field" value={court} onChange={(event) => setCourt(event.target.value)} />
           </label>
         </div>
-        <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
-        >
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div style={{ display: "grid", gap: 8 }}>
             <b style={{ color: "#3478df" }}>TEAM BLUE PAIR</b>
-            {selects("Blue", blue, setBlue, b)}
+            {blue.map((value, index) => (
+              <PlayerCombobox
+                key={index}
+                team="Blue"
+                slot={index + 1}
+                players={b}
+                value={value}
+                selectedIds={selectedIds.filter((id) => id !== value)}
+                onChange={(id) => updateSelection(blue, setBlue, index, id)}
+              />
+            ))}
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             <b>TEAM WHITE PAIR</b>
-            {selects("White", white, setWhite, w)}
+            {white.map((value, index) => (
+              <PlayerCombobox
+                key={index}
+                team="White"
+                slot={index + 1}
+                players={w}
+                value={value}
+                selectedIds={selectedIds.filter((id) => id !== value)}
+                onChange={(id) => updateSelection(white, setWhite, index, id)}
+              />
+            ))}
           </div>
         </div>
+
         <label className="eyebrow">
           OVERRIDE REASON (IF PLAYER IS NOT AVAILABLE)
           <input
             className="field"
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(event) => setReason(event.target.value)}
             placeholder="Required if unavailable or no response"
           />
         </label>
         <button className="btn btn-dark" disabled={busy || !teams.length}>
           {busy ? "Creating…" : "Create match draft"}
         </button>
-        {message && (
-          <p role="status" style={{ fontSize: 13 }}>
-            {message}
-          </p>
-        )}
+        {message && <p role="status" style={{ fontSize: 13 }}>{message}</p>}
       </form>
+
       <div style={{ marginTop: 20, display: "grid", gap: 8 }}>
         <b>Unpublished drafts</b>
-        {matches
-          .filter((m) => !m.published)
-          .map((m) => (
-            <Draft key={m.id} match={m} />
-          ))}
-        {!matches.some((m) => !m.published) && (
+        {matches.filter((match) => !match.published).map((match) => (
+          <Draft key={match.id} match={match} />
+        ))}
+        {!matches.some((match) => !match.published) && (
           <small style={{ color: "var(--muted)" }}>No draft matches yet.</small>
         )}
       </div>
     </section>
   );
 }
+
 function Draft({ match }: { match: DraftMatch }) {
-  const [msg, setMsg] = useState("");
+  const [message, setMessage] = useState("");
   async function publish() {
-    const r = await fetch("/api/organizer/matches/" + match.id + "/publish", {
-      method: "PATCH",
-    });
-    const j = await r.json();
-    setMsg(r.ok ? "Published." : j.error || "Failed.");
-    if (r.ok) location.reload();
+    const response = await fetch("/api/organizer/matches/" + match.id + "/publish", { method: "PATCH" });
+    const result = await response.json();
+    setMessage(response.ok ? "Published." : result.error || "Failed.");
+    if (response.ok) location.reload();
   }
   return (
-    <div
-      style={{
-        border: "1px solid var(--line)",
-        borderRadius: 12,
-        padding: 12,
-        display: "flex",
-        justifyContent: "space-between",
-        gap: 10,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
+    <div style={{
+      border: "1px solid var(--line)",
+      borderRadius: 12,
+      padding: 12,
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 10,
+      alignItems: "center",
+      flexWrap: "wrap",
+    }}>
       <span style={{ fontSize: 13 }}>
         Match {match.match_number} · {match.match_date} · {match.category}
       </span>
-      <button type="button" className="btn btn-light" onClick={publish}>
-        Publish
-      </button>
-      {msg && <small>{msg}</small>}
+      <button type="button" className="btn btn-light" onClick={publish}>Publish</button>
+      {message && <small>{message}</small>}
     </div>
   );
 }
