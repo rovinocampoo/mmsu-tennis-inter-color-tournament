@@ -6,7 +6,7 @@ import { isOrganizerAuthenticated } from "@/lib/organizer-auth";
 const schema = z.object({
   date: z.string(),
   category: z.enum(["Class A", "Class B", "Beginners"]),
-  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  time: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
   court: z.string().max(80).optional(),
   blue: z.array(z.string().uuid()).length(2),
   white: z.array(z.string().uuid()).length(2),
@@ -18,9 +18,6 @@ type Player = {
   id: string;
   team_id: string;
   full_name: string;
-  teams: {
-    name: string;
-  }[];
 };
 
 type Availability = {
@@ -72,9 +69,33 @@ export async function POST(req: Request) {
     );
   }
 
+  // Resolve team IDs explicitly. Avoid relying on PostgREST relationship
+  // cardinality for players -> teams, which may be returned as an object.
+  const { data: teamData, error: teamsError } = await db
+    .from("teams")
+    .select("id,name")
+    .in("name", ["Team Blue", "Team White"]);
+
+  if (teamsError || !teamData) {
+    return NextResponse.json(
+      { error: "Could not verify tournament teams." },
+      { status: 500 },
+    );
+  }
+
+  const blueTeam = teamData.find((team) => team.name === "Team Blue");
+  const whiteTeam = teamData.find((team) => team.name === "Team White");
+
+  if (!blueTeam || !whiteTeam) {
+    return NextResponse.json(
+      { error: "Team Blue or Team White is missing." },
+      { status: 500 },
+    );
+  }
+
   const { data: playerData, error: playersError } = await db
     .from("players")
-    .select("id,team_id,full_name,teams(name)")
+    .select("id,team_id,full_name")
     .in("id", ids)
     .eq("active", true);
 
@@ -86,13 +107,8 @@ export async function POST(req: Request) {
   }
 
   const players = playerData as Player[];
-
-  const bluePlayers = players.filter(
-    (player) => player.teams?.[0]?.name === "Team Blue",
-  );
-  const whitePlayers = players.filter(
-    (player) => player.teams?.[0]?.name === "Team White",
-  );
+  const bluePlayers = players.filter((player) => player.team_id === blueTeam.id);
+  const whitePlayers = players.filter((player) => player.team_id === whiteTeam.id);
 
   if (
     bluePlayers.length !== 2 ||
@@ -166,11 +182,7 @@ export async function POST(req: Request) {
     match_id: match.id,
     player_id: player.id,
     team_id: player.team_id,
-    pair_position:
-      (player.teams?.[0]?.name === "Team Blue"
-        ? value.blue
-        : value.white
-      ).indexOf(player.id) + 1,
+    pair_position: (player.team_id === blueTeam.id ? value.blue : value.white).indexOf(player.id) + 1,
   }));
 
   const { error: insertError } = await db.from("match_players").insert(rows);
