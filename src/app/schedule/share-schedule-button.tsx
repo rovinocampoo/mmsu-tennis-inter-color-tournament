@@ -86,13 +86,34 @@ export default function ShareScheduleButton({
             setBusy(false);
             return;
           }
-          const pngUrl = URL.createObjectURL(png);
-          const anchor = document.createElement("a");
-          anchor.href = pngUrl;
-          anchor.download = `mmsu-match-schedule-${date}.png`;
-          anchor.click();
-          URL.revokeObjectURL(pngUrl);
-          setMessage("Schedule PNG is ready to share.");
+          const file = new File([png], `mmsu-match-schedule-${date}.png`, { type: "image/png" });
+          const shareData = { files: [file], title: "MMSU Match Schedule", text: "MMSU Tennis Club · Inter-Color Tournament" };
+          if (typeof navigator !== "undefined" && typeof navigator.share === "function" && navigator.canShare?.(shareData)) {
+            try {
+              await navigator.share(shareData);
+              setMessage("Schedule image shared.");
+            } catch (error) {
+              if (error instanceof Error && error.name === "AbortError") {
+                setMessage("Sharing cancelled.");
+              } else {
+                const downloadUrl = URL.createObjectURL(png);
+                const anchor = document.createElement("a");
+                anchor.href = downloadUrl;
+                anchor.download = `mmsu-match-schedule-${date}.png`;
+                anchor.click();
+                URL.revokeObjectURL(downloadUrl);
+                setMessage("Schedule PNG downloaded.");
+              }
+            }
+          } else {
+            const downloadUrl = URL.createObjectURL(png);
+            const anchor = document.createElement("a");
+            anchor.href = downloadUrl;
+            anchor.download = `mmsu-match-schedule-${date}.png`;
+            anchor.click();
+            URL.revokeObjectURL(downloadUrl);
+            setMessage("Schedule PNG downloaded.");
+          }
           setBusy(false);
         }, "image/png");
       };
