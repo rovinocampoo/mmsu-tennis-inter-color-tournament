@@ -80,7 +80,7 @@ export default function ShareScheduleButton({
         }
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(svgUrl);
-        canvas.toBlob((png) => {
+        canvas.toBlob(async (png) => {
           if (!png) {
             setMessage("Could not create the schedule PNG.");
             setBusy(false);
