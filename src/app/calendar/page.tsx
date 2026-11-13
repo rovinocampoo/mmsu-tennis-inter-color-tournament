@@ -92,7 +92,7 @@ export default async function Calendar() {
 
           return (
             <Link
-              href={"/results?date=" + date}
+              href={"/schedule?date=" + date}
               key={date}
               className="panel"
               style={{
