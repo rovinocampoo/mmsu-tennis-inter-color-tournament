@@ -67,9 +67,9 @@ export default function ShareHeadToHeadButton({
         <text x="160" y="470" text-anchor="middle" font-family="Arial" font-size="42" font-weight="900" fill="#3478df">B</text>
         <circle cx="712" cy="455" r="48" fill="#f0f2ed"/>
         <text x="712" y="470" text-anchor="middle" font-family="Arial" font-size="42" font-weight="900" fill="#657368">W</text>
-        <text x="230" y="445" font-family="Arial" font-size="18" font-weight="800" fill="#3478df">THE BLUE CREW</text>
+        <text x="230" y="445" font-family="Arial" font-size="18" font-weight="800" fill="#3478df">TEAM BLUE</text>
         <text x="230" y="480" font-family="Arial" font-size="30" font-weight="900" fill="#173326">TEAM BLUE</text>
-        <text x="782" y="445" font-family="Arial" font-size="18" font-weight="800" fill="#657368">THE WHITE SIDE</text>
+        <text x="782" y="445" font-family="Arial" font-size="18" font-weight="800" fill="#657368">TEAM WHITE</text>
         <text x="782" y="480" font-family="Arial" font-size="30" font-weight="900" fill="#173326">TEAM WHITE</text>
         <text x="104" y="565" font-family="Arial" font-size="17" font-weight="800" fill="#718078">MATCH RECORD</text>
         <text x="656" y="565" font-family="Arial" font-size="17" font-weight="800" fill="#718078">MATCH RECORD</text>
