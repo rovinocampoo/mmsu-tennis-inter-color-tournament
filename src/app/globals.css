@@ -5,3 +5,20 @@
 @media(max-width:640px){.shell{width:min(100% - 28px,1160px)}.panel{border-radius:18px}}
 
 @media(max-width:760px){header .shell{height:auto!important;min-height:72px;padding:12px 0;flex-wrap:wrap}header nav{width:100%;justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding-bottom:3px}header nav a{white-space:nowrap}}
+
+
+.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.calendar-weekday{text-align:center;padding:8px 2px;font-size:10px;font-weight:900;letter-spacing:.08em;color:var(--muted)}
+.calendar-empty{min-height:112px}
+.calendar-day{min-width:0;min-height:112px;padding:10px;border:1px solid var(--line);border-radius:14px;background:#fbfcf8;display:flex;flex-direction:column;gap:7px}
+.calendar-day.has-matches{background:#f0f5ec;border-color:#cbdacb}
+.calendar-day.is-today{outline:2px solid #78a85e;outline-offset:1px}
+.calendar-day-number{font-size:17px;font-weight:900;display:flex;align-items:center;gap:6px}
+.today-dot{width:7px;height:7px;border-radius:50%;background:#4d9168;display:inline-block}
+.calendar-day-meta{display:grid;gap:2px;font-size:10px;color:var(--muted)}
+.calendar-day-meta b{font-size:11px;color:var(--forest)}
+.calendar-total{font-size:10px;font-weight:900;color:var(--forest);white-space:nowrap}
+.calendar-day-actions{display:flex;gap:5px;margin-top:auto}
+.calendar-day-actions a{font-size:10px;font-weight:800;padding:5px 7px;border-radius:7px;background:white;border:1px solid var(--line);white-space:nowrap}
+.calendar-day-actions a:hover{background:var(--forest);color:white}
+@media(max-width:640px){.calendar-grid{gap:4px}.calendar-weekday{font-size:8px;padding:5px 0}.calendar-empty{min-height:90px}.calendar-day{min-height:90px;padding:6px 4px;border-radius:9px;gap:5px}.calendar-day-number{font-size:14px}.calendar-day-meta{font-size:8px}.calendar-day-meta b{font-size:9px}.calendar-total{font-size:8px}.calendar-day-actions{gap:3px;flex-direction:column}.calendar-day-actions a{text-align:center;font-size:9px;padding:4px 2px}}
