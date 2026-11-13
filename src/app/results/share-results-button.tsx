@@ -56,7 +56,7 @@ export default function ShareResultsButton({ date, matches, blueTotal, whiteTota
         if (!context) throw new Error("Canvas is unavailable.");
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url);
-        canvas.toBlob((png) => {
+        canvas.toBlob(async (png) => {
           if (!png) { setMessage("Could not create the PNG."); setBusy(false); return; }
           const file = new File([png], `mmsu-results-${date}.png`, { type: "image/png" });
           const shareData = { files: [file], title: "MMSU Match Results", text: "MMSU Tennis Club · Inter-Color Tournament" };
