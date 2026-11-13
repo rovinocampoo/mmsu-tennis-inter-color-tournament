@@ -24,6 +24,18 @@ export default function ResultEntry({ matches }: ResultEntryProps) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const matchesByDate = [...matches]
+    .filter(
+      (match) =>
+        match.published &&
+        !["cancelled", "postponed"].includes(match.status),
+    )
+    .sort((a, b) => b.match_date.localeCompare(a.match_date) || a.match_number - b.match_number)
+    .reduce<Record<string, Match[]>>((groups, match) => {
+      (groups[match.match_date] ??= []).push(match);
+      return groups;
+    }, {});
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -82,19 +94,22 @@ export default function ResultEntry({ matches }: ResultEntryProps) {
         >
           <option value="">Choose published match</option>
 
-          {matches
-            .filter(
-              (match) =>
-                match.published &&
-                !["cancelled", "postponed"].includes(match.status),
-            )
-            .map((match) => (
-              <option key={match.id} value={match.id}>
-                Match {match.match_number} · {match.match_date} ·{" "}
-                {match.category}
-                {match.status === "completed" ? " · correction" : ""}
-              </option>
-            ))}
+          {Object.entries(matchesByDate).map(([date, dateMatches]) => (
+            <optgroup key={date} label={new Date(date + "T12:00:00+08:00").toLocaleDateString("en-PH", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+              timeZone: "Asia/Manila",
+            })}>
+              {dateMatches.map((match) => (
+                <option key={match.id} value={match.id}>
+                  Match {match.match_number} · {match.category}
+                  {match.status === "completed" ? " · correction" : ""}
+                </option>
+              ))}
+            </optgroup>
+          ))}
         </select>
       </label>
 
