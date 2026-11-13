@@ -1,4 +1,6 @@
+import Link from "next/link";
 import ShareScheduleButton from "./share-schedule-button";
+import DateCalendar from "@/components/date-calendar";
 import { supabasePublic } from "@/lib/supabase/server";
 
 export const revalidate = 30;
@@ -33,6 +35,7 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
   const selectedDate = params.date;
   const db = supabasePublic();
   let matches: ScheduleMatch[] = [];
+  let dateCounts: Record<string, number> = {};
 
   if (db) {
     const { data: matchData } = await db
@@ -42,7 +45,12 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
       .order("match_date")
       .order("scheduled_time");
 
-    const publishedMatches = ((matchData ?? []) as MatchRow[]).filter(
+    const allPublishedMatches = (matchData ?? []) as MatchRow[];
+    const dateCounts = allPublishedMatches.reduce<Record<string, number>>((counts, match) => {
+      counts[match.match_date] = (counts[match.match_date] ?? 0) + 1;
+      return counts;
+    }, {});
+    const publishedMatches = allPublishedMatches.filter(
       (match) => !selectedDate || match.match_date === selectedDate,
     );
     const matchIds = publishedMatches.map((match) => match.id);
@@ -92,6 +100,14 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
         Only matches published by the tournament organizers appear here.
         {selectedDate ? ` Showing ${formatDate(selectedDate)}.` : ""}
       </p>
+
+      <DateCalendar basePath="/schedule" selectedDate={selectedDate} counts={dateCounts} label="Published matches" />
+
+      {selectedDate && (
+        <div style={{ marginTop: 18 }}>
+          <Link href="/schedule" style={{ textDecoration: "underline", fontSize: 13 }}>← Show all schedule dates</Link>
+        </div>
+      )}
 
       {dates.length ? (
         dates.map((date) => (
