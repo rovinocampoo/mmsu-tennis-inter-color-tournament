@@ -1,8 +1,9 @@
+import ShareScheduleButton from "./share-schedule-button";
 import { supabasePublic } from "@/lib/supabase/server";
 
 export const revalidate = 30;
 
-type ScheduledMatch = {
+type MatchRow = {
   id: string;
   match_number: number;
   match_date: string;
@@ -10,63 +11,79 @@ type ScheduledMatch = {
   court: string | null;
   category: string;
   status: string;
-  match_players: {
-    team_id: string;
-    players: {
-      full_name: string;
-    }[];
-    teams: {
-      name: string;
-    }[];
-  }[];
 };
 
-type GroupedMatches = Record<string, ScheduledMatch[]>;
+type ScheduleMatch = MatchRow & {
+  blue_players: string[];
+  white_players: string[];
+};
+
+function formatDate(date: string) {
+  return new Date(date + "T12:00:00+08:00").toLocaleDateString("en-PH", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "Asia/Manila",
+  });
+}
 
 export default async function Schedule() {
   const db = supabasePublic();
-
-  let matches: ScheduledMatch[] = [];
+  let matches: ScheduleMatch[] = [];
 
   if (db) {
-    const { data } = await db
+    const { data: matchData } = await db
       .from("matches")
-      .select(
-        "id,match_number,match_date,scheduled_time,court,category,status,match_players(team_id,players(full_name),teams(name))",
-      )
+      .select("id,match_number,match_date,scheduled_time,court,category,status")
       .eq("published", true)
       .order("match_date")
       .order("scheduled_time");
 
-    matches = (data ?? []) as ScheduledMatch[];
+    const publishedMatches = (matchData ?? []) as MatchRow[];
+    const matchIds = publishedMatches.map((match) => match.id);
+
+    if (matchIds.length) {
+      const [{ data: assignments }, { data: teams }, { data: players }] =
+        await Promise.all([
+          db.from("match_players").select("match_id,player_id,team_id").in("match_id", matchIds),
+          db.from("teams").select("id,name"),
+          db.from("players").select("id,full_name"),
+        ]);
+
+      const teamNameById = new Map((teams ?? []).map((team) => [team.id, team.name]));
+      const playerNameById = new Map((players ?? []).map((player) => [player.id, player.full_name]));
+      const byMatch = new Map<string, { blue_players: string[]; white_players: string[] }>();
+
+      for (const assignment of assignments ?? []) {
+        const entry = byMatch.get(assignment.match_id) ?? { blue_players: [], white_players: [] };
+        const teamName = teamNameById.get(assignment.team_id);
+        const playerName = playerNameById.get(assignment.player_id);
+
+        if (playerName && teamName === "Team Blue") entry.blue_players.push(playerName);
+        if (playerName && teamName === "Team White") entry.white_players.push(playerName);
+        byMatch.set(assignment.match_id, entry);
+      }
+
+      matches = publishedMatches.map((match) => ({
+        ...match,
+        ...(byMatch.get(match.id) ?? { blue_players: [], white_players: [] }),
+      }));
+    }
   }
 
-  const grouped = matches.reduce<GroupedMatches>((groups, match) => {
-    if (!groups[match.match_date]) {
-      groups[match.match_date] = [];
-    }
-
-    groups[match.match_date].push(match);
-
+  const grouped = matches.reduce<Record<string, ScheduleMatch[]>>((groups, match) => {
+    (groups[match.match_date] ??= []).push(match);
     return groups;
   }, {});
-
   const dates = Object.keys(grouped);
 
   return (
-    <main className="shell" style={{ paddingTop: 44 }}>
+    <main className="shell" style={{ paddingTop: 44, paddingBottom: 56 }}>
       <div className="eyebrow">FIXTURES & COURTS</div>
-
-      <h1
-        style={{
-          fontSize: 42,
-          letterSpacing: "-.05em",
-          margin: "10px 0",
-        }}
-      >
+      <h1 style={{ fontSize: 42, letterSpacing: "-.05em", margin: "10px 0" }}>
         Match schedule
       </h1>
-
       <p style={{ color: "var(--muted)" }}>
         Only matches published by the tournament organizers appear here.
       </p>
@@ -74,89 +91,32 @@ export default async function Schedule() {
       {dates.length ? (
         dates.map((date) => (
           <section key={date} style={{ marginTop: 28 }}>
-            <h2 style={{ fontSize: 20 }}>
-              {new Date(date + "T12:00:00+08:00").toLocaleDateString("en-PH", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              })}
-            </h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+              <h2 style={{ fontSize: 20, margin: 0 }}>{formatDate(date)}</h2>
+              <ShareScheduleButton date={date} matches={grouped[date]} />
+            </div>
 
             <div style={{ display: "grid", gap: 12 }}>
               {grouped[date].map((match) => (
-                <article
-                  className="panel"
-                  key={match.id}
-                  style={{ padding: 20 }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <b>
-                      Match {match.match_number} · {match.category}
-                    </b>
-
-                    <span className="pill" style={{ background: "#edf3e9" }}>
-                      {match.status}
-                    </span>
+                <article className="panel" key={match.id} style={{ padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                    <b>Match {match.match_number} · {match.category}</b>
+                    <span className="pill" style={{ background: "#edf3e9" }}>{match.status}</span>
                   </div>
 
-                  <div
-                    style={{
-                      marginTop: 14,
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                    }}
-                  >
-                    {(["blue", "white"] as const).map((team, index) => {
-                      const teamPlayers = match.match_players.filter((player) =>
-                        player.teams?.[0]?.name?.toLowerCase().includes(team),
-                      );
-
-                      return (
-                        <div
-                          key={team}
-                          style={{
-                            background: index ? "#f3f3ed" : "#eaf1fb",
-                            padding: 14,
-                            borderRadius: 14,
-                          }}
-                        >
-                          <b>{index ? "Team White" : "Team Blue"}</b>
-
-                          {teamPlayers.map((player) => (
-                            <div
-                              key={
-                                player.team_id + player.players?.[0]?.full_name
-                              }
-                              style={{
-                                fontSize: 13,
-                                marginTop: 7,
-                              }}
-                            >
-                              {player.players?.[0]?.full_name}
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
+                  <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div style={{ background: "#eaf1fb", padding: 14, borderRadius: 14 }}>
+                      <b style={{ color: "#245eae" }}>TEAM BLUE</b>
+                      {match.blue_players.map((name) => <div key={name} style={{ fontSize: 13, marginTop: 7 }}>{name}</div>)}
+                    </div>
+                    <div style={{ background: "#f3f3ed", padding: 14, borderRadius: 14 }}>
+                      <b>TEAM WHITE</b>
+                      {match.white_players.map((name) => <div key={name} style={{ fontSize: 13, marginTop: 7 }}>{name}</div>)}
+                    </div>
                   </div>
 
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--muted)",
-                      marginTop: 12,
-                    }}
-                  >
-                    {match.scheduled_time ?? "Time TBA"} ·{" "}
-                    {match.court ?? "Court TBA"}
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 12 }}>
+                    {match.scheduled_time ?? "Time TBA"} · {match.court ?? "Court TBA"}
                   </div>
                 </article>
               ))}
@@ -164,14 +124,7 @@ export default async function Schedule() {
           </section>
         ))
       ) : (
-        <div
-          className="panel"
-          style={{
-            padding: 24,
-            marginTop: 24,
-            color: "var(--muted)",
-          }}
-        >
+        <div className="panel" style={{ padding: 24, marginTop: 24, color: "var(--muted)" }}>
           No matches have been published yet.
         </div>
       )}
