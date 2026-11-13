@@ -58,13 +58,34 @@ export default function ShareResultsButton({ date, matches, blueTotal, whiteTota
         URL.revokeObjectURL(url);
         canvas.toBlob((png) => {
           if (!png) { setMessage("Could not create the PNG."); setBusy(false); return; }
-          const downloadUrl = URL.createObjectURL(png);
-          const anchor = document.createElement("a");
-          anchor.href = downloadUrl;
-          anchor.download = `mmsu-results-${date}.png`;
-          anchor.click();
-          URL.revokeObjectURL(downloadUrl);
-          setMessage("PNG created. You can now share it.");
+          const file = new File([png], `mmsu-results-${date}.png`, { type: "image/png" });
+          const shareData = { files: [file], title: "MMSU Match Results", text: "MMSU Tennis Club · Inter-Color Tournament" };
+          if (typeof navigator !== "undefined" && typeof navigator.share === "function" && navigator.canShare?.(shareData)) {
+            try {
+              await navigator.share(shareData);
+              setMessage("Results image shared.");
+            } catch (error) {
+              if (error instanceof Error && error.name === "AbortError") {
+                setMessage("Sharing cancelled.");
+              } else {
+                const downloadUrl = URL.createObjectURL(png);
+                const anchor = document.createElement("a");
+                anchor.href = downloadUrl;
+                anchor.download = `mmsu-results-${date}.png`;
+                anchor.click();
+                URL.revokeObjectURL(downloadUrl);
+                setMessage("Results PNG downloaded.");
+              }
+            }
+          } else {
+            const downloadUrl = URL.createObjectURL(png);
+            const anchor = document.createElement("a");
+            anchor.href = downloadUrl;
+            anchor.download = `mmsu-results-${date}.png`;
+            anchor.click();
+            URL.revokeObjectURL(downloadUrl);
+            setMessage("Results PNG downloaded.");
+          }
           setBusy(false);
         }, "image/png");
       };
